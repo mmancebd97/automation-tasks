@@ -1,5 +1,5 @@
 ---
-- hosts: 192.168.159.92
+- hosts: all
   become: yes
   tasks:
     - name: Actualizar paquetes en Ubuntu
