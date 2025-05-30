@@ -1,0 +1,8 @@
+---
+
+- hosts: all
+  tasks:
+  - name: Creating an empty file
+    file:
+      path: "/home/mw/"
+      state: touch
