@@ -1,5 +1,5 @@
 ---
-- inventory: mouseworld_inventory
+- hosts: all
   become: yes
   tasks:
     - name: Actualizar paquetes en Ubuntu
