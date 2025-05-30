@@ -1,0 +1,15 @@
+---
+- name: Actualizar repositorios adaptando el locale a inglés o español
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Actualizar repositorios usando el locale detectado
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+   - name: Create a file
+     file:
+       path: "/home/mw/testawx.txt
+       state: touch
