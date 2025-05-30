@@ -11,6 +11,6 @@
 
     - name: Create a file
       file:
-       path: "/home/mw/testawx.txt
-       state: touch
+        path: "/home/mw/testawx.txt
+        state: touch
       become: yes
