@@ -4,5 +4,5 @@
   tasks:
   - name: Creating an empty file
     file:
-      path: "/home/mw/"
+      path: "/home/mw/awxtestgood.txt"
       state: touch
