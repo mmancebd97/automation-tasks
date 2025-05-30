@@ -1,0 +1,8 @@
+---
+- hosts: servidores_ubuntu
+  become: yes
+  tasks:
+    - name: Actualizar paquetes en Ubuntu
+      apt:
+        update_cache: yes
+        upgrade: dist
