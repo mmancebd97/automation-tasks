@@ -9,7 +9,8 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-   - name: Create a file
-     file:
+    - name: Create a file
+      file:
        path: "/home/mw/testawx.txt
        state: touch
+      become: yes
