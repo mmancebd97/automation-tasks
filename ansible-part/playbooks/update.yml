@@ -1,5 +1,5 @@
 ---
-- hosts: servidores_ubuntu
+- hosts: all
   become: yes
   tasks:
     - name: Actualizar paquetes en Ubuntu
