@@ -1,7 +1,7 @@
 ---
 - name: Actualizar repositorios adaptando el locale a inglés o español
   hosts: all
-  become: yes
+  become: true
   vars:
     posibles_locales:
       - en_US.UTF-8
