@@ -9,3 +9,9 @@
       apt:
         update_cache: yes
       when: ansible_os_family == "Debian"
+   
+    - name: Crear archivo de configuración de locale
+      copy:
+        dest: /home/mw/
+        filename: test.txt
+      when: ansible_os_family == "Debian"
