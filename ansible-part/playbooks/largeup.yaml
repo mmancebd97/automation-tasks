@@ -2,38 +2,11 @@
 - name: Actualizar repositorios adaptando el locale a inglés o español
   hosts: all
   become: true
-  vars:
-    posibles_locales:
-      - en_US.UTF-8
-      - es_ES.UTF-8
+
   tasks:
-    - name: Comprobar si existe algún locale UTF-8 soportado
-      shell: |
-        for loc in {{ posibles_locales | join(' ') }}; do
-          locale -a | grep -q "$loc" && echo $loc && break
-        done
-      register: locale_detectado
-      changed_when: false
-
-    - name: Generar el locale si no existe
-      shell: locale-gen {{ item }}
-      when: locale_detectado.stdout == ""
-      loop: "{{ posibles_locales }}"
-      ignore_errors: yes
-
-    - name: Volver a detectar el locale disponible
-      shell: |
-        for loc in {{ posibles_locales | join(' ') }}; do
-          locale -a | grep -q "$loc" && echo $loc && break
-        done
-      register: locale_final
-      changed_when: false
 
     - name: Actualizar repositorios usando el locale detectado
       apt:
         update_cache: yes
-      environment:
-        LANG: "{{ locale_final.stdout | default('C.UTF-8') }}"
-        LC_ALL: "{{ locale_final.stdout | default('C.UTF-8') }}"
       when: ansible_os_family == "Debian"
 
