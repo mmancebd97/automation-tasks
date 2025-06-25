@@ -6,4 +6,6 @@
 
     - name: Check and update repos
       ansible.builtin.apt:
-        update_cache: yes
+        update_cache: true
+        autoremove: true
+        autoclean: true
