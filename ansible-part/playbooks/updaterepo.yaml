@@ -7,7 +7,6 @@
     - name: Actualizar repositorios usando el locale detectado
       apt:
         update_cache: yes
-      when: ansible_os_family == "Debian"
 
     - name: Se ha actualizado con exito
       ansible.builtin.shell:
