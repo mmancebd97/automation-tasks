@@ -7,7 +7,3 @@
     - name: Actualizar repositorios usando el locale detectado
       apt:
         update_cache: yes
-
-    - name: Se ha actualizado con exito
-      ansible.builtin.shell:
-        cmd: echo "Hola"
