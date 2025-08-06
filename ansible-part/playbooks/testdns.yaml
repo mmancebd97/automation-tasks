@@ -1,16 +1,12 @@
 - name: Añadir 2 líneas a un archivo en /etc
   hosts: all
-  become: yes
   tasks:
-    - name: Añadir primera línea
-      become: yes
-      lineinfile:
-        path: /etc/archivo.objetivo
-        line: 'nameserver 8.8.8.8'
-        create: yes
 
-    - name: Añadir segunda línea
+    - name: Verificar si el become funciona
+      shell: whoami
       become: yes
-      lineinfile:
-        path: /etc/resolv.conf
-        line: 'nameserver 8.8.4.4'
+      register: whoami_result
+
+    - name: Mostrar usuario efectivo
+      debug:
+        var: whoami_result.stdout
