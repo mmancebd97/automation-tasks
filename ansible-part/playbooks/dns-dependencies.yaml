@@ -28,3 +28,29 @@
         update_cache: true
         autoremove: true
         autoclean: true
+
+    - name: install resolvconf
+      ansible.builtin.package:
+        name: resolvconf
+        state: present
+
+    - name: enable resolvconf
+      shell: |
+        systemctl enable resolvconf.service
+        systemctl start resolvconf.service
+
+    - name: modify resolv.conf package
+      lineinfile:
+        path: /etc/resolvconf/resolv.conf.d/head
+        line: nameserver 8.8.8.8
+
+    - name: modify resolv.conf package
+      lineinfile:
+        path: /etc/resolvconf/resolv.conf.d/head
+        line: nameserver 8.8.4.4
+
+    - name: update resolvconf package
+      shell: |
+        systemctl resolvconf --enable-updates
+        systemctl resolvconf -u
+
