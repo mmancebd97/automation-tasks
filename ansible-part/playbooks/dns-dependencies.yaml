@@ -1,14 +1,15 @@
 ---
 - name: set-up DNS and Dependencies
   hosts: all
+  become: yes
   tasks:
 
 
-    - name: add 8.8.8.8
+    - name: add 8.8.8.8 & 8.8.4.4
       become: yes
       shell: |
-         echo 'nameserver 8.8.8.8' | tee -a /etc/resolv.conf > /dev/null
-         echo 'nameserver 8.8.4.4' | tee -a /etc/resolv.conf > /dev/null
+         echo 'nameserver 8.8.8.8' >> /etc/resolv.conf
+         echo 'nameserver 8.8.4.4' >> /etc/resolv.conf
 
     - name: update_cache
       ansible.builtin.apt:
