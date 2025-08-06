@@ -1,5 +1,5 @@
 ---
-- name: set-up DNS and Dependencies
+- name: set-up DNS ubuntu 22 or less
   hosts: all
   become: yes
   tasks:
@@ -13,15 +13,6 @@
       lineinfile:
         path: /etc/resolv.conf
         line: 'nameserver 8.8.4.4'
-
-#####
-# Modulo para añadir una shell
-#    - name: add 8.8.8.8 & 8.8.4.4
-#      become: yes
-#      shell: |
-#        echo 'nameserver 8.8.8.8' | tee -a /etc/resolv.conf > /dev/null
-#        echo 'nameserver 8.8.4.4' | tee -a /etc/resolv.conf > /dev/null
-#####
 
     - name: update_cache
       ansible.builtin.apt:
