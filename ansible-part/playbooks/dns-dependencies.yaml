@@ -1,7 +1,9 @@
 ---
 - name: set-up DNS and Dependencies
   hosts: all
+  become: yes
   tasks:
+
     - name: Añadir nameserver 8.8.8.8
       ansible.builtin.lineinfile:
         path: /etc/resolv.conf
