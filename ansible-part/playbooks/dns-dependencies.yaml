@@ -4,21 +4,15 @@
   become: yes
   tasks:
 
-    - name: Añadir nameserver 8.8.8.8
-      ansible.builtin.lineinfile:
-        path: /etc/resolv.conf
-        line: 'nameserver 8.8.8.8'
-        state: present
-        create: yes
-      become: yes
+    - name: add 8.8.8.8
+       lineinfile:
+       path: "/etc/resolv.conf"
+       line: nameserver 8.8.8.8
 
-    - name: Añadir nameserver 8.8.4.4
-      ansible.builtin.lineinfile:
-        path: /etc/resolv.conf
-        line: 'nameserver 8.8.4.4'
-        state: present
-        create: yes
-      become: yes
+    - name: add 8.8.4.4
+       lineinfile:
+       path: "/etc/resolv.conf"
+       line: nameserver 8.8.4.4
 
     - name: update_cache
       ansible.builtin.apt:
