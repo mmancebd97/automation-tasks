@@ -50,7 +50,8 @@
         line: nameserver 8.8.4.4
 
     - name: update resolvconf package
+      become: yes
       shell: |
-        systemctl resolvconf --enable-updates
-        systemctl resolvconf -u
+        resolvconf --enable-updates
+        resolvconf -u
 
