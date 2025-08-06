@@ -4,12 +4,24 @@
   become: yes
   tasks:
 
+    - name: Añadir DNS 8.8.8.8 solo si no está presente
+      lineinfile:
+        path: /etc/resolv.conf
+        line: 'nameserver 8.8.8.8'
 
-    - name: add 8.8.8.8 & 8.8.4.4
-      become: yes
-      shell: |
-        echo 'nameserver 8.8.8.8' | tee -a /etc/resolv.conf > /dev/null
-        echo 'nameserver 8.8.4.4' | tee -a /etc/resolv.conf > /dev/null
+    - name: Añadir DNS 8.8.4.4 solo si no está presente
+      lineinfile:
+        path: /etc/resolv.conf
+        line: 'nameserver 8.8.4.4'
+
+#####
+# Modulo para añadir una shell
+#    - name: add 8.8.8.8 & 8.8.4.4
+#      become: yes
+#      shell: |
+#        echo 'nameserver 8.8.8.8' | tee -a /etc/resolv.conf > /dev/null
+#        echo 'nameserver 8.8.4.4' | tee -a /etc/resolv.conf > /dev/null
+#####
 
     - name: update_cache
       ansible.builtin.apt:
