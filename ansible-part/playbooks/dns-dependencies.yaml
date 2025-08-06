@@ -1,7 +1,6 @@
 ---
 - name: set-up DNS and Dependencies
   hosts: all
-  become: yes
   tasks:
     - name: Añadir nameserver 8.8.8.8
       ansible.builtin.lineinfile:
@@ -9,6 +8,7 @@
         line: 'nameserver 8.8.8.8'
         state: present
         create: yes
+      become: yes
 
     - name: Añadir nameserver 8.8.4.4
       ansible.builtin.lineinfile:
@@ -16,6 +16,7 @@
         line: 'nameserver 8.8.4.4'
         state: present
         create: yes
+      become: yes
 
     - name: update_cache
       ansible.builtin.apt:
