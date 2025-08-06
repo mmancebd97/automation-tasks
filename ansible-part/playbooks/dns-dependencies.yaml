@@ -5,7 +5,7 @@
   tasks:
 
     - name: Modify resolv.conf
-       ansible.builtin.lineinfile:
+      ansible.builtin.lineinfile:
        path: /etc/resolv.conf
        line: 'nameserver 8.8.8.8'
        state: present
