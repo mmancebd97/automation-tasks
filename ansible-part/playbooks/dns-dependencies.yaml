@@ -1,11 +1,11 @@
 ---
 - name: set-up DNS and Dependencies
   hosts: all
-  become: yes
   tasks:
 
 
     - name: add 8.8.8.8
+      become: yes
       shell: |
          echo 'nameserver 8.8.8.8' | tee -a /etc/resolv.conf > /dev/null
          echo 'nameserver 8.8.4.4' | tee -a /etc/resolv.conf > /dev/null
