@@ -6,18 +6,10 @@
 
 
     - name: add 8.8.8.8
-      ansible.builtin.lineinfile:
-       path: /etc/resolv.conf
-       line: nameserver 8.8.8.8
-       create: yes
+      shell: |
+        echo 'nameserver 8.8.8.8' >> /etc/resolv.conf
+        echo 'nameserver 8.8.4.4' >> /etc/resolv.conf
 
-
-
-#    - name: add 8.8.8.8
-#       lineinfile:
-#       path: "/etc/resolv.conf"
-#       line: nameserver 8.8.8.8
-#
     - name: update_cache
       ansible.builtin.apt:
         update_cache: true
