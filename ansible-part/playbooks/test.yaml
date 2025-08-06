@@ -1,0 +1,15 @@
+---
+- name: set dns
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Añadir DNS 8.8.8.8 solo si no está presente
+      lineinfile:
+        path: /etc/resolv.conf
+        line: 'nameserver 8.8.8.8'
+
+    - name: Añadir DNS 8.8.4.4 solo si no está presente
+      lineinfile:
+        path: /etc/resolv.conf
+        line: 'nameserver 8.8.4.4'
