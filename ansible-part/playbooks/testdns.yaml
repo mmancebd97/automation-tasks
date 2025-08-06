@@ -3,12 +3,14 @@
   become: yes
   tasks:
     - name: Añadir primera línea
+      become: yes
       lineinfile:
         path: /etc/archivo.objetivo
         line: 'nameserver 8.8.8.8'
         create: yes
 
     - name: Añadir segunda línea
+      become: yes
       lineinfile:
         path: /etc/resolv.conf
         line: 'nameserver 8.8.4.4'
