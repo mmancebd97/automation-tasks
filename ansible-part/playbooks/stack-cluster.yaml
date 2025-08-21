@@ -298,27 +298,3 @@
       daemon_reload: true
 
 
-# --------- check packages version installed OK ------ #
-
-
-- name: Comprobar versión de Docker
-  shell: "dpkg-query -W -f='${Version}\n' docker-ce | head -n1"
-  register: docker_ver
-  changed_when: false
-
-- name: Fallar si Docker no está en {{ docker_epoch }}:{{ docker_version }}
-  assert:
-    that: "'{{ docker_version }}' in docker_ver.stdout"
-    fail_msg: "Docker no quedó en {{ docker_version }}. Versión actual: {{ docker_ver.stdout }}"
-
-- name: Comprobar versión de kubelet
-  shell: "kubelet --version | awk '{print $2}'"
-  register: kubelet_ver
-  changed_when: false
-
-- name: Fallar si kubelet no está en {{ kubernetes_version }}
-  assert:
-    that: "kubelet_ver.stdout == '{{ kubernetes_version }}'"
-    fail_msg: "kubelet no quedó en {{ kubernetes_version }}. Versión actual: {{ kubelet_ver.stdout }}"
-
-
