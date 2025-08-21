@@ -1,0 +1,298 @@
+---
+- name: Instalar Kubernetes 1.30.14, Docker 27.5.1 y cri-dockerd 0.3.9 (tarball)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Versiones solicitadas
+    kubernetes_version: "1.30.14"
+    k8s_minor_repo: "v1.30"
+    docker_version: "27.5.1"
+    docker_epoch: "5"
+    cri_dockerd_version: "0.3.9"
+
+    # Tarball de cri-dockerd 0.3.9 amd64 y nombre local
+    cri_dockerd_tgz_url: "https://github.com/Mirantis/cri-dockerd/releases/download/v{{ cri_dockerd_version }}/cri-dockerd-{{ cri_dockerd_version }}.amd64.tgz"
+    cri_dockerd_tgz_path: "/tmp/cri-dockerd-{{ cri_dockerd_version }}.amd64.tgz"
+
+    prereq_packages:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+    - software-properties-common
+
+  pre_tasks:
+  - name: Comprobar familia de SO soportada
+    assert:
+      that: ansible_os_family == "Debian"
+      fail_msg: "Este playbook está preparado para Debian/Ubuntu."
+
+  - name: Asegurar carpeta de keyrings
+    file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: "0755"
+
+  tasks:
+  # ---------- Kernel & sysctl ----------
+  - name: Cargar módulos del kernel requeridos por Kubernetes
+    copy:
+      dest: /etc/modules-load.d/k8s.conf
+      mode: "0644"
+      content: |
+        overlay
+        br_netfilter
+
+  - name: Cargar módulo overlay
+    modprobe:
+      name: overlay
+      state: present
+
+  - name: Cargar módulo br_netfilter
+    modprobe:
+      name: br_netfilter
+      state: present
+
+  - name: Ajustes sysctl para bridge/iptables y forward
+    copy:
+      dest: /etc/sysctl.d/99-kubernetes-cri.conf
+      mode: "0644"
+      content: |
+        net.bridge.bridge-nf-call-iptables  = 1
+        net.bridge.bridge-nf-call-ip6tables = 1
+        net.ipv4.ip_forward                 = 1
+
+  - name: Aplicar sysctl
+    command: sysctl --system
+    changed_when: false
+
+  # ---------- Swap off ----------
+  - name: Deshabilitar swap runtime
+    command: swapoff -a
+    when: ansible_swaptotal_mb | int > 0
+    changed_when: ansible_swaptotal_mb | int > 0
+
+  - name: Deshabilitar swap en /etc/fstab
+    replace:
+      path: /etc/fstab
+      regexp: '^(.*\s+swap\s+.*)$'
+      replace: '# \1'
+
+  # ---------- Repositorio Docker ----------
+  - name: Instalar prerequisitos
+    apt:
+      name: "{{ prereq_packages }}"
+      state: present
+      update_cache: yes
+
+  - name: Descargar clave GPG de Docker
+    get_url:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      dest: /etc/apt/keyrings/docker.asc
+      mode: "0644"
+
+  - name: Convertir clave GPG de Docker a keyring
+    command: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
+    args:
+      creates: /etc/apt/keyrings/docker.gpg
+
+  - name: Añadir repo oficial de Docker (Ubuntu)
+    apt_repository:
+      filename: docker
+      repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
+      state: present
+      update_cache: yes
+
+  - name: Instalar Docker 27.5.1 (pin explícito)
+    apt:
+      name:
+      - "docker-ce={{ docker_epoch }}:{{ docker_version }}*"
+      - "docker-ce-cli={{ docker_epoch }}:{{ docker_version }}*"
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      state: present
+      allow_downgrade: yes
+      update_cache: yes
+
+  - name: Configurar Docker daemon.json (cgroupdriver=systemd)
+    copy:
+      dest: /etc/docker/daemon.json
+      mode: "0644"
+      content: |
+        {
+          "exec-opts": ["native.cgroupdriver=systemd"],
+          "log-driver": "json-file",
+          "log-opts": { "max-size": "10m" },
+          "storage-driver": "overlay2"
+        }
+    notify: Restart Docker
+
+  - name: Habilitar y arrancar Docker
+    systemd:
+      name: docker
+      enabled: true
+      state: started
+
+  # ---------- Instalar cri-dockerd 0.3.9 desde TGZ ----------
+  - name: Descargar tarball cri-dockerd {{ cri_dockerd_version }} (amd64)
+    get_url:
+      url: "{{ cri_dockerd_tgz_url }}"
+      dest: "{{ cri_dockerd_tgz_path }}"
+      mode: "0644"
+
+  - name: Extraer tarball en el directorio raíz (/)
+    unarchive:
+      src: "{{ cri_dockerd_tgz_path }}"
+      dest: "/"
+      remote_src: true
+      # Evita re-extracción si ya existe el binario
+      creates: "/usr/local/bin/cri-dockerd"
+
+  - name: Asegurar permisos del binario cri-dockerd
+    file:
+      path: /usr/local/bin/cri-dockerd
+      mode: "0755"
+      state: file
+
+  # (Opcional robustez) Crear unidades systemd si el tarball no las trajo
+  - name: Comprobar unidad cri-docker.service
+    stat:
+      path: /etc/systemd/system/cri-docker.service
+    register: cri_service
+
+  - name: Comprobar unidad cri-docker.socket
+    stat:
+      path: /etc/systemd/system/cri-docker.socket
+    register: cri_socket
+
+  - name: Instalar unidad cri-docker.service (fallback)
+    copy:
+      dest: /etc/systemd/system/cri-docker.service
+      mode: "0644"
+      content: |
+        [Unit]
+        Description=CRI Interface for Docker Application Container Engine
+        Documentation=https://docs.mirantis.com
+        After=network-online.target firewalld.service docker.service
+        Wants=network-online.target
+        Requires=cri-docker.socket
+
+        [Service]
+        Type=notify
+        ExecStart=/usr/local/bin/cri-dockerd --container-runtime-endpoint fd:// --network-plugin=cni
+        ExecReload=/bin/kill -s HUP $MAINPID
+        TimeoutSec=0
+        RestartSec=2
+        Restart=always
+        StartLimitBurst=3
+        StartLimitInterval=60s
+        LimitNOFILE=infinity
+        LimitNPROC=infinity
+        LimitCORE=infinity
+        TasksMax=infinity
+        Delegate=yes
+        KillMode=process
+
+        [Install]
+        WantedBy=multi-user.target
+    when: not cri_service.stat.exists
+
+  - name: Instalar unidad cri-docker.socket (fallback)
+    copy:
+      dest: /etc/systemd/system/cri-docker.socket
+      mode: "0644"
+      content: |
+        
+        [Unit]
+        Description=CRI-dockerd socket for the API
+        PartOf=cri-docker.service
+
+        [Socket]
+        ListenStream=/var/run/cri-dockerd.sock
+        SocketMode=0660
+        SocketUser=root
+        SocketGroup=docker
+
+        [Install]
+        WantedBy=sockets.target
+    when: not cri_socket.stat.exists
+
+  - name: Recargar systemd, habilitar y arrancar cri-dockerd (socket + servicio)
+    systemd:
+      daemon_reload: true
+      name: "{{ item }}"
+      enabled: true
+      state: started
+    loop:
+    - cri-docker.socket
+    - cri-docker.service
+
+  # ---------- Repositorio Kubernetes 1.30 ----------
+  - name: Descargar Release.key de Kubernetes {{ k8s_minor_repo }}
+    get_url:
+      url: "https://pkgs.k8s.io/core:/stable:/{{ k8s_minor_repo }}/deb/Release.key"
+      dest: /etc/apt/keyrings/kubernetes-{{ k8s_minor_repo }}.asc
+      mode: "0644"
+
+  - name: Convertir clave de Kubernetes a keyring
+    command: "gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ k8s_minor_repo }}.gpg /etc/apt/keyrings/kubernetes-{{ k8s_minor_repo }}.asc"
+    args:
+      creates: "/etc/apt/keyrings/kubernetes-{{ k8s_minor_repo }}.gpg"
+
+  - name: Añadir repo Kubernetes {{ k8s_minor_repo }}
+    apt_repository:
+      filename: "kubernetes-{{ k8s_minor_repo }}"
+      repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-{{ k8s_minor_repo }}.gpg] https://pkgs.k8s.io/core:/stable:/{{ k8s_minor_repo }}/deb/ /"
+      state: present
+      update_cache: yes
+
+  - name: Resolver cadena de versión completa para kubeadm ({{ kubernetes_version }})
+    shell: "apt-cache madison kubeadm | awk -v v='{{ kubernetes_version }}' '$3 ~ \"^\"v {print $3; exit}'"
+    register: kubeadm_fullver
+    changed_when: false
+
+  - name: Fijar versión completa encontrada o fallback -00
+    set_fact:
+      k8s_pkg_version: "{{ (kubeadm_fullver.stdout | trim) | default(kubernetes_version + '-00', true) }}"
+
+  - name: Instalar kubelet/kubeadm/kubectl {{ k8s_pkg_version }}
+    apt:
+      name:
+      - "kubelet={{ k8s_pkg_version }}"
+      - "kubeadm={{ k8s_pkg_version }}"
+      - "kubectl={{ k8s_pkg_version }}"
+      state: present
+      allow_downgrade: yes
+      update_cache: yes
+
+  - name: Mantener (hold) versiones de Kubernetes
+    dpkg_selections:
+      name: "{{ item }}"
+      selection: hold
+    loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+  - name: Habilitar kubelet
+    systemd:
+      name: kubelet
+      enabled: true
+      state: started
+
+  handlers:
+  - name: Restart Docker
+    systemd:
+      name: docker
+      state: restarted
+      daemon_reload: true
+
+  - name: Restart kubelet
+    systemd:
+      name: kubelet
+      state: restarted
+      daemon_reload: true
