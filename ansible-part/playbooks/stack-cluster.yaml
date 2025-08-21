@@ -145,13 +145,14 @@
       dest: "{{ cri_dockerd_tgz_path }}"
       mode: "0644"
 
-  - name: Extraer tarball en el directorio raíz (/)
-    unarchive:
-      src: "{{ cri_dockerd_tgz_path }}"
-      dest: "/"
+  - name: Instalar binario en /usr/local/bin
+    copy:
+      src: "/opt/cri-dockerd-{{ cri_dockerd_version }}/cri-dockerd/usr/local/bin/cri-dockerd"
+      dest: "/usr/local/bin/cri-dockerd"
+      mode: "0755"
+      owner: root
+      group: root
       remote_src: true
-      # Evita re-extracción si ya existe el binario
-      creates: "/usr/local/bin/cri-dockerd"
 
   - name: Asegurar permisos del binario cri-dockerd
     file:
