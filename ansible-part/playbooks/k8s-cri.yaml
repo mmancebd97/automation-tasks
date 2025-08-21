@@ -138,41 +138,90 @@
         enabled: true
         state: started
 
-    # ---------- Instalar cri-dockerd 0.3.9 desde TGZ ----------
+    # ---------- Instalar cri-dockerd 0.3.9 desde TGZ (robusto) ----------
+    - name: Definir dir de staging para cri-dockerd
+      set_fact:
+        cri_staging_dir: "/opt/cri-dockerd-{{ cri_dockerd_version }}"
+
     - name: Descargar tarball cri-dockerd {{ cri_dockerd_version }} (amd64)
       get_url:
         url: "{{ cri_dockerd_tgz_url }}"
         dest: "{{ cri_dockerd_tgz_path }}"
         mode: "0644"
 
-    - name: Extraer tarball en / con strip del primer componente
+    - name: Crear directorio de staging
+      file:
+        path: "{{ cri_staging_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Extraer tarball en staging (sin strip)
       unarchive:
         src: "{{ cri_dockerd_tgz_path }}"
-        dest: "/"
+        dest: "{{ cri_staging_dir }}"
         remote_src: true
-        extra_opts:
-          - --strip-components=1   # quita la carpeta superior "cri-dockerd/"
-        creates: "/usr/local/bin/cri-dockerd"
 
-    - name: Asegurar permisos del binario cri-dockerd
-      file:
-        path: /usr/local/bin/cri-dockerd
-        mode: "0755"
+    # --- Binario ---
+    - name: Localizar binario cri-dockerd en staging
+      find:
+        paths: "{{ cri_staging_dir }}"
+        patterns: "cri-dockerd"
+        file_type: file
+        recurse: true
+      register: cri_find_bin
+
+    - name: Fallar si no se encontró el binario cri-dockerd en el TGZ
+      fail:
+        msg: "No se encontró el binario 'cri-dockerd' dentro del tarball en {{ cri_staging_dir }}."
+      when: cri_find_bin.matched == 0
+
+    - name: Instalar binario en /usr/local/bin/cri-dockerd
+      copy:
+        src: "{{ cri_find_bin.files[0].path }}"
+        dest: "/usr/local/bin/cri-dockerd"
         owner: root
         group: root
-        state: file
+        mode: "0755"
+        remote_src: true
 
-    # (Opcional robustez) Crear unidades systemd si el tarball no las trajo
-    - name: Comprobar unidad cri-docker.service
-      stat:
-        path: /etc/systemd/system/cri-docker.service
-      register: cri_service
+    # --- Unidades systemd (usar las del TGZ si existen; si no, fallback) ---
+    - name: Buscar unidad cri-docker.service en staging
+      find:
+        paths: "{{ cri_staging_dir }}"
+        patterns: "cri-docker.service"
+        file_type: file
+        recurse: true
+      register: cri_find_service
 
-    - name: Comprobar unidad cri-docker.socket
-      stat:
-        path: /etc/systemd/system/cri-docker.socket
-      register: cri_socket
+    - name: Buscar unidad cri-docker.socket en staging
+      find:
+        paths: "{{ cri_staging_dir }}"
+        patterns: "cri-docker.socket"
+        file_type: file
+        recurse: true
+      register: cri_find_socket
 
+    - name: Instalar unidad cri-docker.service desde TGZ (si existe)
+      copy:
+        src: "{{ cri_find_service.files[0].path }}"
+        dest: /etc/systemd/system/cri-docker.service
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      when: cri_find_service.matched > 0
+
+    - name: Instalar unidad cri-docker.socket desde TGZ (si existe)
+      copy:
+        src: "{{ cri_find_socket.files[0].path }}"
+        dest: /etc/systemd/system/cri-docker.socket
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      when: cri_find_socket.matched > 0
+
+    # Fallback si el TGZ no traía unidades
     - name: Instalar unidad cri-docker.service (fallback)
       copy:
         dest: /etc/systemd/system/cri-docker.service
@@ -186,7 +235,7 @@
 
           [Service]
           Type=notify
-          ExecStart=/usr/local/bin/cri-dockerd --container-runtime-endpoint fd://=cni
+          ExecStart=/usr/local/bin/cri-dockerd --container-runtime-endpoint fd://
           ExecReload=/bin/kill -s HUP $MAINPID
           Restart=always
           StartLimitInterval=0
@@ -194,7 +243,7 @@
 
           [Install]
           WantedBy=multi-user.target
-      when: not cri_service.stat.exists
+      when: cri_find_service.matched == 0
 
     - name: Instalar unidad cri-docker.socket (fallback)
       copy:
@@ -213,15 +262,16 @@
 
           [Install]
           WantedBy=sockets.target
-      when: not cri_socket.stat.exists
+      when: cri_find_socket.matched == 0
 
-    - name: Forzar ExecStart a /usr/local/bin/cri-dockerd si la unidad existe
+    # Asegurar que ExecStart apunta al binario en /usr/local/bin
+    - name: Normalizar ruta de ExecStart a /usr/local/bin/cri-dockerd
       replace:
         path: /etc/systemd/system/cri-docker.service
         regexp: '/usr/bin/cri-dockerd'
         replace: '/usr/local/bin/cri-dockerd'
-      when: cri_service.stat.exists
 
+    # Habilitar/arrancar
     - name: Recargar systemd, habilitar y arrancar cri-dockerd (socket + servicio)
       systemd:
         daemon_reload: true
@@ -231,7 +281,6 @@
       loop:
         - cri-docker.socket
         - cri-docker.service
-
     # ---------- Repositorio Kubernetes 1.30 ----------
     - name: Descargar Release.key de Kubernetes {{ k8s_minor_repo }}
       get_url:
