@@ -115,8 +115,9 @@
       - docker-buildx-plugin
       - docker-compose-plugin
       state: present
-      allow_downgrade: yes
       update_cache: yes
+      force_apt_get: yes
+      dpkg_options: "force-confdef,force-confold"
 
   - name: Configurar Docker daemon.json (cgroupdriver=systemd)
     copy:
@@ -206,7 +207,6 @@
       dest: /etc/systemd/system/cri-docker.socket
       mode: "0644"
       content: |
-        
         [Unit]
         Description=CRI-dockerd socket for the API
         PartOf=cri-docker.service
@@ -266,9 +266,9 @@
       - "kubeadm={{ k8s_pkg_version }}"
       - "kubectl={{ k8s_pkg_version }}"
       state: present
-      allow_downgrade: yes
       update_cache: yes
-
+      force_apt_get: yes
+      dpkg_options: "force-confdef,force-confold"
   - name: Mantener (hold) versiones de Kubernetes
     dpkg_selections:
       name: "{{ item }}"
@@ -296,3 +296,29 @@
       name: kubelet
       state: restarted
       daemon_reload: true
+
+
+# --------- check packages version installed OK ------ #
+
+
+- name: Comprobar versión de Docker
+  shell: "dpkg-query -W -f='${Version}\n' docker-ce | head -n1"
+  register: docker_ver
+  changed_when: false
+
+- name: Fallar si Docker no está en {{ docker_epoch }}:{{ docker_version }}
+  assert:
+    that: "'{{ docker_version }}' in docker_ver.stdout"
+    fail_msg: "Docker no quedó en {{ docker_version }}. Versión actual: {{ docker_ver.stdout }}"
+
+- name: Comprobar versión de kubelet
+  shell: "kubelet --version | awk '{print $2}'"
+  register: kubelet_ver
+  changed_when: false
+
+- name: Fallar si kubelet no está en {{ kubernetes_version }}
+  assert:
+    that: "kubelet_ver.stdout == '{{ kubernetes_version }}'"
+    fail_msg: "kubelet no quedó en {{ kubernetes_version }}. Versión actual: {{ kubelet_ver.stdout }}"
+
+
