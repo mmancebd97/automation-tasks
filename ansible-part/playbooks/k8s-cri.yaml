@@ -320,14 +320,6 @@
         force_apt_get: yes
         dpkg_options: "force-confdef,force-confold"
 
-    - name: Configurar kubelet para usar cri-dockerd
-      copy:
-        dest: /etc/default/kubelet
-        mode: "0644"
-        content: |
-          KUBELET_EXTRA_ARGS=--container-runtime-endpoint=unix:///var/run/cri-dockerd.sock
-      notify: Restart kubelet
-
     - name: Mantener (hold) versiones de Kubernetes
       dpkg_selections:
         name: "{{ item }}"
