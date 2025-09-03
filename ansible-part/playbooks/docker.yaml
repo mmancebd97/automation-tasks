@@ -93,3 +93,4 @@
         name: '{{ user }}'
         groups: sudo,docker
         append: yes
+      become: yes
